@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build & test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      DOTNET_NOLOGO: '1'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      TampCoreMode: package
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # TruffleHog 3.x is a single Go binary. Install via the official
+      # install script (Linux/macOS) or scoop on Windows.
+      - name: Install TruffleHog (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin v3.83.7
+          trufflehog --version
+
+      - name: Install TruffleHog (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = '3.83.7'
+          $url = "https://github.com/trufflesecurity/trufflehog/releases/download/v$version/trufflehog_${version}_windows_amd64.tar.gz"
+          $tmp = New-TemporaryFile
+          Invoke-WebRequest -Uri $url -OutFile "$tmp.tar.gz"
+          tar -xzf "$tmp.tar.gz" -C "$env:RUNNER_TEMP" trufflehog.exe
+          Move-Item -Force "$env:RUNNER_TEMP\trufflehog.exe" "C:\Windows\System32\trufflehog.exe"
+          trufflehog --version
+
+      - name: Install supported .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Verify SDKs
+        shell: bash
+        run: |
+          dotnet --info
+          dotnet --list-sdks
+          dotnet --list-runtimes
+
+      - name: NuGet cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore Tamp.TruffleHog.slnx
+
+      - name: Build
+        run: dotnet build Tamp.TruffleHog.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test Tamp.TruffleHog.slnx --no-build --configuration Release --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: ./TestResults/**/*.trx
+          if-no-files-found: warn
