@@ -52,4 +52,43 @@ public static class TruffleHog
         configure(s);
         return s.ToCommandPlan(tool);
     }
+
+    // ---- Object-init overloads (0.1.1+, TAM-161) ----
+    // Two equivalent authoring styles; both produce identical CommandPlans. Fluent
+    // stays canonical in docs and `tamp init` templates; object-init available for
+    // consumers who prefer the C# initializer shape.
+    //
+    //     TruffleHog.Git(tool, new() { Uri = "." });
+    //
+    // is equivalent to:
+    //
+    //     TruffleHog.Git(tool, s => s.SetUri("."));
+
+    public static CommandPlan Git(Tool tool, TruffleHogGitSettings settings)
+    {
+        if (tool is null) throw new ArgumentNullException(nameof(tool));
+        if (settings is null) throw new ArgumentNullException(nameof(settings));
+        return settings.ToCommandPlan(tool);
+    }
+
+    public static CommandPlan GitHub(Tool tool, TruffleHogGitHubSettings settings)
+    {
+        if (tool is null) throw new ArgumentNullException(nameof(tool));
+        if (settings is null) throw new ArgumentNullException(nameof(settings));
+        return settings.ToCommandPlan(tool);
+    }
+
+    public static CommandPlan Filesystem(Tool tool, TruffleHogFilesystemSettings settings)
+    {
+        if (tool is null) throw new ArgumentNullException(nameof(tool));
+        if (settings is null) throw new ArgumentNullException(nameof(settings));
+        return settings.ToCommandPlan(tool);
+    }
+
+    public static CommandPlan Docker(Tool tool, TruffleHogDockerSettings settings)
+    {
+        if (tool is null) throw new ArgumentNullException(nameof(tool));
+        if (settings is null) throw new ArgumentNullException(nameof(settings));
+        return settings.ToCommandPlan(tool);
+    }
 }

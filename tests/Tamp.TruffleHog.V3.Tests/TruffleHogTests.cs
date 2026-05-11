@@ -322,10 +322,10 @@ public sealed class TruffleHogTests
     [Fact]
     public void Null_Configure_Throws_For_Required_Verbs()
     {
-        Assert.Throws<ArgumentNullException>(() => TruffleHog.Git(FakeTool(), null!));
-        Assert.Throws<ArgumentNullException>(() => TruffleHog.GitHub(FakeTool(), null!));
-        Assert.Throws<ArgumentNullException>(() => TruffleHog.Filesystem(FakeTool(), null!));
-        Assert.Throws<ArgumentNullException>(() => TruffleHog.Docker(FakeTool(), null!));
+        Assert.Throws<ArgumentNullException>(() => TruffleHog.Git(FakeTool(), (Action<TruffleHogGitSettings>)null!));
+        Assert.Throws<ArgumentNullException>(() => TruffleHog.GitHub(FakeTool(), (Action<TruffleHogGitHubSettings>)null!));
+        Assert.Throws<ArgumentNullException>(() => TruffleHog.Filesystem(FakeTool(), (Action<TruffleHogFilesystemSettings>)null!));
+        Assert.Throws<ArgumentNullException>(() => TruffleHog.Docker(FakeTool(), (Action<TruffleHogDockerSettings>)null!));
     }
 
     [Fact]
