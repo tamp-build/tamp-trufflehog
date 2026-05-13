@@ -10,7 +10,12 @@
     <PackageId>Tamp.TruffleHog.V3</PackageId>
     <Description>Tamp wrapper for TruffleHog 3.x — secret scanning across git, github, filesystem, and docker. GitHub token typed as Secret with redaction.</Description>
     <IsPackable>true</IsPackable>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(TampCorePath)" Condition="'$(TampCoreMode)' == 'project'" />
