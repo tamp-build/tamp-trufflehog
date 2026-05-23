@@ -49,8 +49,11 @@ public abstract class TruffleHogSettingsBase
     /// <summary>Filter the results type set. Comma-list of <c>verified</c>, <c>unverified</c>, <c>unknown</c>, <c>filtered_unverified</c>. Maps to <c>--results</c>.</summary>
     public string? Results { get; set; }
 
-    /// <summary>Write output to a file (in addition to printing to stdout). Maps to <c>--output</c>.</summary>
-    public string? Output { get; set; }
+    // NB: TruffleHog v3 has no --output flag. Results are written to stdout
+    // (JSON-per-line when --json is set). Adopters who want a file capture
+    // should redirect stdout at the target body level (Process / shell), or
+    // use ProcessRunner.Capture to read stdout in-process. Tracked in TAM-263;
+    // dropped in 0.1.2.
 
     /// <summary>Max archive size in bytes before bailing. Maps to <c>--archive-max-size</c>.</summary>
     public long? ArchiveMaxSize { get; set; }
@@ -86,7 +89,6 @@ public abstract class TruffleHogSettingsBase
         if (NoUpdate) args.Add("--no-update");
         if (PrintAvgDetectorTime) args.Add("--print-avg-detector-time");
         if (!string.IsNullOrEmpty(Results)) { args.Add("--results"); args.Add(Results!); }
-        if (!string.IsNullOrEmpty(Output)) { args.Add("--output"); args.Add(Output!); }
         if (ArchiveMaxSize is { } ams) { args.Add("--archive-max-size"); args.Add(ams.ToString()); }
         if (ArchiveMaxDepth is { } amd) { args.Add("--archive-max-depth"); args.Add(amd.ToString()); }
         if (!string.IsNullOrEmpty(ArchiveTimeout)) { args.Add("--archive-timeout"); args.Add(ArchiveTimeout!); }
@@ -128,7 +130,6 @@ public static class TruffleHogSettingsBaseExtensions
     public static T SetNoUpdate<T>(this T s, bool v = true) where T : TruffleHogSettingsBase { s.NoUpdate = v; return s; }
     public static T SetPrintAvgDetectorTime<T>(this T s, bool v = true) where T : TruffleHogSettingsBase { s.PrintAvgDetectorTime = v; return s; }
     public static T SetResults<T>(this T s, string spec) where T : TruffleHogSettingsBase { s.Results = spec; return s; }
-    public static T SetOutput<T>(this T s, string path) where T : TruffleHogSettingsBase { s.Output = path; return s; }
     public static T SetArchiveMaxSize<T>(this T s, long bytes) where T : TruffleHogSettingsBase { s.ArchiveMaxSize = bytes; return s; }
     public static T SetArchiveMaxDepth<T>(this T s, int depth) where T : TruffleHogSettingsBase { s.ArchiveMaxDepth = depth; return s; }
     public static T SetArchiveTimeout<T>(this T s, string duration) where T : TruffleHogSettingsBase { s.ArchiveTimeout = duration; return s; }

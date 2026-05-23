@@ -68,7 +68,6 @@ public sealed class TruffleHogTests
             .SetNoUpdate()
             .SetPrintAvgDetectorTime()
             .SetResults("verified,unknown")
-            .SetOutput("scan.json")
             .SetArchiveMaxSize(20_000_000)
             .SetArchiveMaxDepth(3)
             .SetArchiveTimeout("30s")
@@ -89,8 +88,10 @@ public sealed class TruffleHogTests
         Assert.Contains("--no-update", args);
         Assert.Contains("--print-avg-detector-time", args);
         Assert.Contains("--results", args); Assert.Contains("verified,unknown", args);
-        Assert.Contains("--output", args); Assert.Contains("scan.json", args);
         Assert.Contains("--archive-max-size", args); Assert.Contains("20000000", args);
+        // TAM-263: trufflehog v3 has no --output flag; wrapper no longer emits one.
+        Assert.DoesNotContain("--output", args);
+        Assert.DoesNotContain("scan.json", args);
         Assert.Contains("--archive-max-depth", args); Assert.Contains("3", args);
         Assert.Contains("--archive-timeout", args); Assert.Contains("30s", args);
         Assert.Contains("--allow-verification-overlap", args);
