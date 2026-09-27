@@ -3,6 +3,13 @@
 All notable changes to this repo's packable projects are recorded here. Version
 numbers refer to the central `<Version>` in `Directory.Build.props` (TAM-81).
 
+## [Unreleased]
+
+### Added
+
+- Package now ships XML documentation files (`.xml`) alongside the assembly, so consumers get IntelliSense and API docs. (Mirrors [tamp-build/tamp#3](https://github.com/tamp-build/tamp/pull/50).)
+
+
 ## 0.1.2
 
 ### Fixed
