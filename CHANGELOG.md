@@ -5,6 +5,8 @@ numbers refer to the central `<Version>` in `Directory.Build.props` (TAM-81).
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-09-27
+
 ### Added
 
 - Package now ships XML documentation files (`.xml`) alongside the assembly, so consumers get IntelliSense and API docs. (Mirrors [tamp-build/tamp#3](https://github.com/tamp-build/tamp/pull/50).)
