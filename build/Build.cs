@@ -1,8 +1,10 @@
 using Tamp;
 using Tamp.NetCli.V10;
 using Tamp.Telegram;
+using Tamp.Components;
+using Tamp.Components.NetCli.V10;
 
-class Build : TampBuild
+class Build : TampBuild, IDotNetPack
 {
     public static int Main(string[] args) => Execute<Build>(args);
 
@@ -13,14 +15,10 @@ class Build : TampBuild
         TelegramBuildReporter.FromEnvironment();
 
     [Parameter("Build configuration")]
-    Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
+    public Configuration Configuration { get; set; } = IsLocalBuild ? Configuration.Debug : Configuration.Release;
 
-    [Parameter("Package version override", EnvironmentVariable = "PACKAGE_VERSION")]
-#pragma warning disable CS0649
-    readonly string? Version;
-#pragma warning restore CS0649
 
-    [Solution] readonly Solution Solution = null!;
+    [Solution] public Solution Solution { get; set; } = null!;
     [GitRepository] readonly GitRepository Git = null!;
 
     [Secret("NuGet API key", EnvironmentVariable = "NUGET_API_KEY")]
@@ -40,6 +38,8 @@ class Build : TampBuild
 
     AbsolutePath Artifacts => RootDirectory / "artifacts";
 
+    public AbsolutePath ArtifactsDirectory => Artifacts;
+
     Target Info => _ => _.Executes(() =>
     {
         Console.WriteLine($"  Branch:        {Git.Branch ?? "<detached>"}");
@@ -51,17 +51,8 @@ class Build : TampBuild
         .Description("Delete bin/obj and the artifacts directory.")
         .Executes(() => CleanArtifacts());
 
-    Target Restore => _ => _.Executes(() => DotNet.Restore(s => s.SetProject(Solution.Path)));
-
-    Target Compile => _ => _
-        .DependsOn(nameof(Restore))
-        .Executes(() => DotNet.Build(s => s
-            .SetProject(Solution.Path)
-            .SetConfiguration(Configuration)
-            .SetNoRestore(true)));
-
     Target Test => _ => _
-        .DependsOn(nameof(Compile))
+        .DependsOn(nameof(ICompile.Compile))
         .Description("Unit tests only — integration tests need trufflehog on PATH.")
         .Executes(() => DotNet.Test(s => s
             .SetProject(RootDirectory / "tests" / "Tamp.TruffleHog.V3.Tests" / "Tamp.TruffleHog.V3.Tests.csproj")
@@ -72,19 +63,8 @@ class Build : TampBuild
             .SetSettings((RootDirectory / "build" / "coverlet.runsettings").Value)
             .SetResultsDirectory(Artifacts / "test-results")));
 
-    Target Pack => _ => _
-        .DependsOn(nameof(Test))
-        .Executes(() => DotNet.Pack(s =>
-        {
-            s.SetProject(RootDirectory / "src" / "Tamp.TruffleHog.V3" / "Tamp.TruffleHog.V3.csproj");
-            s.SetConfiguration(Configuration);
-            s.SetNoBuild(true);
-            s.SetOutput(Artifacts);
-            if (!string.IsNullOrEmpty(Version)) s.SetProperty("Version", Version);
-        }));
-
     Target Push => _ => _
-        .DependsOn(nameof(Pack))
+        .DependsOn(nameof(IPack.Pack))
         .Requires(() => NuGetApiKey != null)
         .Executes(() => Artifacts.GlobFiles("*.nupkg")
             .Select(p => DotNet.NuGetPush(s => s
@@ -94,12 +74,12 @@ class Build : TampBuild
                 .SetSkipDuplicate(true))));
 
     Target Ci => _ => _
-        .DependsOn(nameof(Info), nameof(Clean), nameof(Pack));
+        .DependsOn(nameof(Info), nameof(Clean), nameof(Test), nameof(IPack.Pack));
 
-    Target Default => _ => _.DependsOn(nameof(Compile));
+    Target Default => _ => _.DependsOn(nameof(ICompile.Compile));
 
     Target SonarBegin => _ => _
-        .Before(nameof(Compile))
+        .Before(nameof(ICompile.Compile))
         .Requires(() => SonarToken != null)
         .Executes(() => Tamp.SonarScanner.V10.SonarScanner.Begin(SonarTool, s =>
         {
