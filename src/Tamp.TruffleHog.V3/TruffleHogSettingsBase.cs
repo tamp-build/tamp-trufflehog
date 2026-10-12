@@ -67,6 +67,18 @@ public abstract class TruffleHogSettingsBase
     /// <summary>Allow verifications to share quotas. Maps to <c>--allow-verification-overlap</c>.</summary>
     public bool AllowVerificationOverlap { get; set; }
 
+    /// <summary>
+    /// Don't read binary files' contents. Maps to <c>--force-skip-binaries</c>.
+    /// The primary performance lever for large vendored binaries — e.g. puppeteer's bundled
+    /// Chromium under <c>node_modules</c>, which trufflehog otherwise spends minutes reading.
+    /// Note this skips reading binaries, not walking them; pair it with path-scoping (see
+    /// <see cref="TruffleHogFilesystemSettings"/>) to also avoid the walk.
+    /// </summary>
+    public bool ForceSkipBinaries { get; set; }
+
+    /// <summary>Don't extract/scan archive files (zip/tar/…). Maps to <c>--force-skip-archives</c>. Avoids expensive in-memory extraction on vendored trees.</summary>
+    public bool ForceSkipArchives { get; set; }
+
     /// <summary>Subclasses produce the source verb (e.g. <c>git</c>) and the source-specific args.</summary>
     protected abstract IEnumerable<string> BuildSourceArguments();
 
@@ -93,6 +105,8 @@ public abstract class TruffleHogSettingsBase
         if (ArchiveMaxDepth is { } amd) { args.Add("--archive-max-depth"); args.Add(amd.ToString()); }
         if (!string.IsNullOrEmpty(ArchiveTimeout)) { args.Add("--archive-timeout"); args.Add(ArchiveTimeout!); }
         if (AllowVerificationOverlap) args.Add("--allow-verification-overlap");
+        if (ForceSkipBinaries) args.Add("--force-skip-binaries");
+        if (ForceSkipArchives) args.Add("--force-skip-archives");
     }
 
     public CommandPlan ToCommandPlan(Tool tool)
@@ -134,4 +148,6 @@ public static class TruffleHogSettingsBaseExtensions
     public static T SetArchiveMaxDepth<T>(this T s, int depth) where T : TruffleHogSettingsBase { s.ArchiveMaxDepth = depth; return s; }
     public static T SetArchiveTimeout<T>(this T s, string duration) where T : TruffleHogSettingsBase { s.ArchiveTimeout = duration; return s; }
     public static T SetAllowVerificationOverlap<T>(this T s, bool v = true) where T : TruffleHogSettingsBase { s.AllowVerificationOverlap = v; return s; }
+    public static T SetForceSkipBinaries<T>(this T s, bool v = true) where T : TruffleHogSettingsBase { s.ForceSkipBinaries = v; return s; }
+    public static T SetForceSkipArchives<T>(this T s, bool v = true) where T : TruffleHogSettingsBase { s.ForceSkipArchives = v; return s; }
 }

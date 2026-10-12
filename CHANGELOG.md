@@ -5,6 +5,17 @@ numbers refer to the central `<Version>` in `Directory.Build.props` (TAM-81).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-12
+
+### Added
+
+- **`SetForceSkipBinaries()` / `SetForceSkipArchives()`** on the shared base (`--force-skip-binaries` / `--force-skip-archives`). The primary performance lever for large vendored binaries — e.g. puppeteer's bundled Chromium under `node_modules` — which trufflehog otherwise spends minutes reading. Common engine flags (valid on `git`, `filesystem`, etc.).
+- **`TruffleHogFilesystemSettings.AddPaths(params string[])`** — ergonomic path-scoping to scan real source dirs (`AddPaths("src", "build")`) rather than `.`.
+
+### Changed
+
+- Clarified the docs on `IncludePathsFile` / `ExcludePathsFile`: these are **regex result filters** over the walked file set — they do **not** stop traversal. The performant approach for a tree with a vendored toolchain is to **scope the paths** (and/or `SetForceSkipBinaries()`), not to scan `.` with an exclude file. ([#5](https://github.com/tamp-build/tamp-trufflehog/issues/5))
+
 ## [0.1.3] — 2026-09-27
 
 ### Added

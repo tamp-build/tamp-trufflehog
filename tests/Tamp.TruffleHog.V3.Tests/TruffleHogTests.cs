@@ -356,4 +356,48 @@ public sealed class TruffleHogTests
         var idx = IndexOf(plan.Arguments, "--include-detectors");
         Assert.Equal(string.Join(',', detectors), plan.Arguments[idx + 1]);
     }
+
+    // ---- #5: perf levers for heavy vendored trees (node_modules/Chromium) ----
+
+    [Fact]
+    public void ForceSkip_Binaries_And_Archives_Emit_Flags()
+    {
+        var plan = TruffleHog.Filesystem(FakeTool(), s => s
+            .AddPath("src")
+            .SetForceSkipBinaries()
+            .SetForceSkipArchives());
+        Assert.Contains("--force-skip-binaries", plan.Arguments);
+        Assert.Contains("--force-skip-archives", plan.Arguments);
+    }
+
+    [Fact]
+    public void ForceSkip_Also_Available_On_Git_Source()
+    {
+        // Common engine flags — valid on git too, not just filesystem.
+        var plan = TruffleHog.Git(FakeTool(), s => s.SetUri(".").SetForceSkipBinaries());
+        Assert.Contains("--force-skip-binaries", plan.Arguments);
+    }
+
+    [Fact]
+    public void AddPaths_Scopes_To_Multiple_Source_Dirs()
+    {
+        // The performant pattern: scope to real source paths rather than scanning "." + an exclude file.
+        var plan = TruffleHog.Filesystem(FakeTool(), s => s.AddPaths("src", "build", "tests"));
+        Assert.Contains("src", plan.Arguments);
+        Assert.Contains("build", plan.Arguments);
+        Assert.Contains("tests", plan.Arguments);
+        Assert.DoesNotContain(".", plan.Arguments);
+    }
+
+    [Fact]
+    public void ExcludePathsFile_Is_A_Results_Filter_Flag_Not_A_Scope()
+    {
+        // Documents the issue-#5 semantics: --exclude-paths is emitted as a flag over the walked
+        // set; it does NOT replace scanning the given paths. Both the scope path and the flag appear.
+        var plan = TruffleHog.Filesystem(FakeTool(), s => s
+            .AddPath(".")
+            .SetExcludePathsFile("exclude.txt"));
+        Assert.Equal("exclude.txt", plan.Arguments[IndexOf(plan.Arguments, "--exclude-paths") + 1]);
+        Assert.Contains(".", plan.Arguments); // the broad scope is still passed — exclude doesn't narrow traversal
+    }
 }
