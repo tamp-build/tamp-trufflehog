@@ -80,6 +80,30 @@ public sealed class SecretScanOptions
         return this;
     }
 
+    /// <summary>
+    /// The schema version declared in the GitLab report. Defaults to
+    /// <see cref="TruffleHogReport.GitLabSchemaVersion"/>, which is a deliberately conservative
+    /// floor — see its remarks for why the newest published patch is the wrong thing to claim.
+    /// </summary>
+    /// <remarks>
+    /// Set this to the version bundled in the consuming instance's release when it is known and an
+    /// exact match is wanted. Must be <c>major.minor.patch</c>; GitLab's own schema constrains the
+    /// field to that shape and rejects the whole report otherwise.
+    /// </remarks>
+    public string GitLabSchemaVersion { get; set; } = TruffleHogReport.GitLabSchemaVersion;
+
+    /// <summary>Set <see cref="GitLabSchemaVersion"/>.</summary>
+    /// <exception cref="ArgumentException">Not a <c>major.minor.patch</c> version.</exception>
+    public SecretScanOptions SetGitLabSchemaVersion(string version)
+    {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(version ?? "", @"^[0-9]+\.[0-9]+\.[0-9]+$"))
+            throw new ArgumentException(
+                $"'{version}' is not a major.minor.patch version. GitLab's report schema constrains "
+                + "the version field to that shape and rejects the whole report otherwise.", nameof(version));
+        GitLabSchemaVersion = version!;
+        return this;
+    }
+
     /// <summary>Set <see cref="CommitSha"/>.</summary>
     public SecretScanOptions SetCommitSha(string? sha) { CommitSha = sha; return this; }
 
