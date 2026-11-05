@@ -5,6 +5,20 @@ numbers refer to the central `<Version>` in `Directory.Build.props` (TAM-81).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The GitLab report no longer declares the newest schema patch** ([#11](https://github.com/tamp-build/tamp-trufflehog/issues/11)). `version` was a `const` pinned to `15.2.5`, the newest published `secret-detection-report-format` tag. But a consumer validates against the schema bundled in **its own** release, so a self-managed instance a release or two behind does not recognise the declared version, falls back to its own newest, and attaches a schema-version warning to every ingested finding — noise on every security report in every pipeline, which is the kind of warning that trains people to stop reading warnings and makes a genuine schema problem indistinguishable from the standing one.
+
+  The default is now **15.2.0**, a floor rather than a ceiling: the declared version is a compatibility claim, and the lowest version the document satisfies claims exactly what it needs. **Verified rather than assumed** — the findings, clean and failure reports this emitter produces were each validated against the published 15.2.0, 15.2.1 and 15.2.5 schemas, and all three accept all three.
+
+### Added
+
+- **`SecretScanOptions.GitLabSchemaVersion`** ([#11](https://github.com/tamp-build/tamp-trufflehog/issues/11)) so a caller whose consumer bundles a known patch can match it exactly. The `const` being unreachable was the real blocker; it stays public as the documented default. A malformed value is refused up front with its reason, since GitLab constrains the field to `major.minor.patch` and rejects the whole report otherwise — failing before the upload beats failing after it.
+
+### Notes
+
+- **The SARIF and `secret_detection` outputs are alternatives for ingestion, not a pair to publish together** ([#11](https://github.com/tamp-build/tamp-trufflehog/issues/11)). GitLab ingests the two report types independently and neither deduplicates against the other, so publishing both puts every secret in the dashboard twice — once as a secret-detection finding, once through the SARIF as a generic finding at a different severity. Documented on `ToGitLabSecretDetection` and in the README, whose example now publishes the native report and keeps the SARIF as a plain artifact. Not discoverable until a report is ingested, which is why it is written down.
+
 ## [0.3.0] - 2026-11-05 - publishable secret-scan reports, and a clean scan you can prove
 
 ### Added

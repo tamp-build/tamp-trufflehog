@@ -106,14 +106,35 @@ Target SecretScan => _ => _
 ```
 
 ```yaml
-# .gitlab-ci.yml -- both are Ultimate-tier report types.
+# .gitlab-ci.yml -- secret_detection is the one to ingest. See the warning below before adding sarif.
 secret-scan:
   script: ./tamp.sh SecretScan
   artifacts:
+    paths:
+      - artifacts/secrets.sarif           # kept as a plain artifact, deliberately not ingested
     reports:
       secret_detection: artifacts/gl-secret-detection-report.json
-      sarif: artifacts/secrets.sarif      # GitLab 19.1+; GA in 19.2
 ```
+
+> **The two report types are alternatives for ingestion, not a belt-and-braces pair.** GitLab ingests
+> `secret_detection` and `sarif` independently and neither deduplicates against the other, so
+> publishing both puts **every secret in the dashboard twice** — once as a secret-detection finding
+> and once, through the SARIF, as a generic finding at a different severity. Publish the native report
+> and keep the SARIF as a plain artifact (above), or publish the SARIF alone. This is not discoverable
+> until a report is ingested, which is why it is stated here.
+
+### Which schema version the report declares
+
+`version` defaults to **15.2.0** — a floor, not the newest published patch. A consumer validates
+against the schema bundled in *its own* release, so declaring the newest upstream version makes every
+instance even one release behind fall back to its own newest and attach a schema-version warning to
+every finding. That is noise on every report in every pipeline, and it makes a genuine schema problem
+indistinguishable from the standing one.
+
+The floor is verified rather than assumed: the findings, clean and failure reports this emitter
+produces were each validated against the published 15.2.0, 15.2.1 and 15.2.5 schemas, and all three
+accept all three. Set `SecretScanOptions.SetGitLabSchemaVersion("15.2.4")` to match a specific
+instance exactly.
 
 ### Three states, not two
 

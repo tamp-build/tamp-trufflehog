@@ -394,6 +394,50 @@ public sealed class TruffleHogReportTests
     public void Timestamps_Are_Utc_With_No_Zone_Suffix(string input, string expected)
         => Assert.Equal(expected, TruffleHogReport.GitLabTimestamp(DateTimeOffset.Parse(input, System.Globalization.CultureInfo.InvariantCulture)));
 
+    // ─── #11: the declared schema version ─────────────────────────────────
+
+    [Fact]
+    public void The_Declared_Schema_Version_Is_A_Floor_Not_The_Newest_Patch()
+    {
+        // A consumer validates against the schema bundled in its own release. Declaring the newest
+        // published patch makes every instance even one release behind attach a schema-version
+        // warning to every finding — noise on every report in every pipeline.
+        Assert.Equal("15.2.0", TruffleHogReport.GitLabSchemaVersion);
+
+        var result = TruffleHogReport.Read(Lines(GitFinding(), Finished()), Options());
+        var report = JsonNode.Parse(TruffleHogReport.ToGitLabSecretDetection(result, Options()))!;
+        Assert.Equal("15.2.0", (string?)report["version"]);
+    }
+
+    [Fact]
+    public void The_Declared_Schema_Version_Can_Be_Matched_To_The_Consuming_Instance()
+    {
+        // The const was the actual blocker: the value being debatable matters much less than it
+        // being unreachable.
+        var options = Options();
+        options.SetGitLabSchemaVersion("15.2.4");
+
+        var result = TruffleHogReport.Read(Lines(GitFinding(), Finished()), options);
+        var report = JsonNode.Parse(TruffleHogReport.ToGitLabSecretDetection(result, options))!;
+
+        Assert.Equal("15.2.4", (string?)report["version"]);
+    }
+
+    [Theory]
+    [InlineData("15.2")]
+    [InlineData("15")]
+    [InlineData("15.2.0-rc1")]
+    [InlineData("v15.2.0")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void A_Malformed_Schema_Version_Is_Refused_Up_Front(string? version)
+    {
+        // GitLab constrains the field to major.minor.patch and rejects the whole report otherwise,
+        // so failing here beats failing after the artifact is uploaded.
+        var ex = Assert.Throws<ArgumentException>(() => new SecretScanOptions().SetGitLabSchemaVersion(version!));
+        Assert.Contains("major.minor.patch", ex.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void The_Report_Carries_Everything_The_Schema_Requires()
     {

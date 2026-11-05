@@ -42,10 +42,32 @@ namespace Tamp.TruffleHog.V3;
 public static class TruffleHogReport
 {
     /// <summary>
-    /// The GitLab security-report schema version this emitter targets, as declared by
-    /// <c>secret-detection-report-format.json</c> itself.
+    /// The default GitLab security-report schema version declared in the emitted report: a
+    /// <b>floor</b>, not the newest published patch.
     /// </summary>
-    public const string GitLabSchemaVersion = "15.2.5";
+    /// <remarks>
+    /// <para>
+    /// <b>A consumer validates against the schema bundled in its own release, not the newest one
+    /// upstream.</b> A self-managed instance a release or two behind bundles an earlier patch, does
+    /// not recognise a newer declared version, falls back to its own newest, and attaches a
+    /// schema-version warning to every ingested finding. That is noise on every security report in
+    /// every pipeline — the kind of warning that trains people to stop reading warnings, and that
+    /// makes a genuine schema problem indistinguishable from the standing one.
+    /// </para>
+    /// <para>
+    /// So the declared version is a compatibility claim and should be the <em>lowest</em> version
+    /// whose schema this document satisfies, not the highest that exists. <c>15.2.0</c> is that
+    /// floor, verified rather than assumed: the findings, clean and failure reports this emitter
+    /// produces were each validated against the published <c>15.2.0</c>, <c>15.2.1</c> and
+    /// <c>15.2.5</c> schemas, and all three accept all three. The required-field set does not move
+    /// within a patch line.
+    /// </para>
+    /// <para>
+    /// Override it with <see cref="SecretScanOptions.GitLabSchemaVersion"/> when the consuming
+    /// instance's bundled version is known and an exact match is wanted. (tamp-trufflehog#11)
+    /// </para>
+    /// </remarks>
+    public const string GitLabSchemaVersion = "15.2.0";
 
     /// <summary>TruffleHog's completion log record: the positive signal that a scan finished.</summary>
     private const string FinishedMessage = "finished scanning";
@@ -214,6 +236,14 @@ public static class TruffleHogReport
     /// <see cref="SecretFinding.Fingerprint"/> rides in <c>tracking.signatures</c> — GitLab's own
     /// mechanism for following a finding across runs, so no invented field is needed.
     /// </para>
+    /// <para>
+    /// <b>This and <see cref="ToSarif"/> are alternatives for ingestion, not a pair to publish
+    /// together.</b> GitLab ingests the two report types independently and neither deduplicates
+    /// against the other, so publishing both puts every secret in the security dashboard twice —
+    /// once as a secret-detection finding and once, through the SARIF, as a generic finding at a
+    /// different severity. Publish this one and keep the SARIF as a plain build artifact, or publish
+    /// the SARIF alone. (tamp-trufflehog#11)
+    /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// A finding has no commit and <see cref="SecretScanOptions.CommitSha"/> was not set.
@@ -327,7 +357,7 @@ public static class TruffleHogReport
 
         var report = new JsonObject
         {
-            ["version"] = GitLabSchemaVersion,
+            ["version"] = options.GitLabSchemaVersion,
             ["scan"] = scan,
             ["vulnerabilities"] = vulnerabilities,
         };
