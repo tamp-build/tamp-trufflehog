@@ -5,6 +5,8 @@ numbers refer to the central `<Version>` in `Directory.Build.props` (TAM-81).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05 - publishable secret-scan reports, and a clean scan you can prove
+
 ### Added
 
 - **SARIF and GitLab `secret_detection` reports** ([#8](https://github.com/tamp-build/tamp-trufflehog/issues/8)). TruffleHog exposed JSON-line output only, so a consumer had nothing to publish and a CI system had no record a secret scan ran. The dangerous half of that: **a missing report is indistinguishable from a clean scan**, so an absent report, a skipped scan and a crashed scan all looked alike.
