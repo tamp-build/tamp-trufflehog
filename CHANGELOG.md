@@ -5,6 +5,8 @@ numbers refer to the central `<Version>` in `Directory.Build.props` (TAM-81).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-05 - a schema-version floor, overridable
+
 ### Fixed
 
 - **The GitLab report no longer declares the newest schema patch** ([#11](https://github.com/tamp-build/tamp-trufflehog/issues/11)). `version` was a `const` pinned to `15.2.5`, the newest published `secret-detection-report-format` tag. But a consumer validates against the schema bundled in **its own** release, so a self-managed instance a release or two behind does not recognise the declared version, falls back to its own newest, and attaches a schema-version warning to every ingested finding — noise on every security report in every pipeline, which is the kind of warning that trains people to stop reading warnings and makes a genuine schema problem indistinguishable from the standing one.
