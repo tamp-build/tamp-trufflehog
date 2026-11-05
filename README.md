@@ -55,6 +55,118 @@ Target SecretScan => _ => _.Executes(() =>
 exposes `TruffleHog.GitHub(...)`; pick a target name that doesn't
 shadow it.)
 
+## Reports: SARIF and GitLab `secret_detection`
+
+TruffleHog emits JSON lines and nothing else, so there is nothing a CI system can publish and no
+record that a secret scan ran at all. The second half is the dangerous one: **a missing report is
+indistinguishable from a clean scan**, so an absent report, a skipped scan and a crashed scan all look
+alike downstream. That is a silent failure in a security control.
+
+It is not hypothetical. Measured on TruffleHog 3.95.3:
+
+| | exit code | error record | chunks / bytes |
+|---|---|---|---|
+| clean scan of a real directory | 0 | -- | 1 / 12 |
+| **scan of a path that does not exist** | **0** | `encountered errors during scan` | **0 / 0** |
+
+Same exit code, same (empty) findings. `TruffleHogReport` reads the scan's own telemetry rather than
+trusting the exit code, and calls the second case what it is.
+
+```csharp
+Target SecretScan => _ => _
+    .Description("[Security] TruffleHog, with a publishable report either way")
+    .Executes(() =>
+    {
+        var started = DateTimeOffset.UtcNow;
+        var settings = new TruffleHogGitSettings()
+            .SetUri($"file://{RootDirectory}")
+            .SetJson()
+            .SetFail();                      // still what decides the build
+
+        var run = ProcessRunner.Run(TruffleHog.Git(TruffleHogTool, settings), exitHandling: ExitHandling.Capture);
+
+        var options = new SecretScanOptions
+        {
+            SourceRoot = RootDirectory,
+            CommitSha = Environment.GetEnvironmentVariable("CI_COMMIT_SHA"),
+            ExitCode = run.ExitCode,
+            StartedAt = started,
+            EndedAt = DateTimeOffset.UtcNow,
+        }.SetVerificationFrom(settings);
+
+        var result = TruffleHogReport.Read(run.StandardOutput, options);
+        Log.Information("{Result}", result);   // "secret scan completed: 1 finding(s), 0 verified, 560 byte(s) examined"
+
+        TruffleHogReport.WriteGitLabSecretDetection(result, Artifacts / "gl-secret-detection-report.json", options);
+        TruffleHogReport.WriteSarif(result, Artifacts / "secrets.sarif");
+
+        if (result.Status == SecretScanStatus.Failure)
+            throw new Exception("secret scan did not run: " + string.Join("; ", result.Messages));
+    });
+```
+
+```yaml
+# .gitlab-ci.yml -- both are Ultimate-tier report types.
+secret-scan:
+  script: ./tamp.sh SecretScan
+  artifacts:
+    reports:
+      secret_detection: artifacts/gl-secret-detection-report.json
+      sarif: artifacts/secrets.sarif      # GitLab 19.1+; GA in 19.2
+```
+
+### Three states, not two
+
+| state | `scan.status` | `vulnerabilities` | how it is decided |
+|---|---|---|---|
+| clean | `success` | `[]` -- a positive receipt | completion record seen, bytes > 0, no error record, exit 0 |
+| findings | `success` | populated | same, plus exit 0 or **183** (TruffleHog's "secrets found" code under `--fail` -- a completed scan, not a failure) |
+| failed | `failure` | `[]`, with reasons in `scan.messages` | no completion record, an error record, 0 bytes examined, or any other exit code |
+
+A clean run writes the file. That is the point: silence is not evidence.
+
+### Nothing reversible is emitted, by construction
+
+`SecretFinding` has no property that can hold a secret. `Raw`, `RawV2`, `Redacted`, `ExtraData` and
+`StructuredData` are never read out of the JSON, so no downstream code -- a report, a log line, an
+exception message, a debugger's `ToString()` -- can emit one. GitLab's `raw_source_code_extract` field
+is deliberately never populated.
+
+> **TruffleHog's `Redacted` field is not redacted.** Measured on 3.95.3 with the AWS detector,
+> `Redacted` was byte-for-byte identical to `Raw` -- the full access key ID. It is a per-detector
+> courtesy with no guarantee behind it, so treating it as publishable means publishing the credential.
+> `RawV2` contained `Raw` plus the secret half of the pair. `ExtraData` is excluded as a class: it is
+> detector-defined and has carried credential-bearing URLs.
+
+**Fingerprints identify the position, never the value.** `SecretFinding.Fingerprint` is SHA-256 over
+detector, source kind, file, line and commit. Hashing the secret would be reversible for any
+low-entropy value -- the hash of a guessable input is a lookup, not a one-way function -- and publishing
+such a hash of a live credential is a liability. So the value is not an input: the fingerprint leaks
+nothing even when the secret is weak, and a secret rotated in place keeps its identity across runs. It
+rides in GitLab's own `tracking.signatures`, not an invented field, and in SARIF's
+`partialFingerprints`.
+
+### The commit is mandatory, and not every source has one
+
+GitLab's schema requires `location.commit.sha`. The `git` source reports a commit **per finding** --
+the one that introduced the secret, which is more precise than the pipeline's HEAD. A `filesystem` or
+`docker` scan has no commit at all, so `SecretScanOptions.CommitSha` supplies it (`CI_COMMIT_SHA`), and
+the GitLab report **throws** without it rather than inventing one. SARIF has no such requirement, so a
+filesystem scan is still publishable that way.
+
+### Severity, stated rather than implied
+
+Verified -> `Critical` / SARIF `error`: the credential was confirmed live. Unverified -> `Unknown` /
+SARIF `warning`: nothing checked whether it works, and `Unknown` is a real value in GitLab's enum and
+the literally accurate one. Neither is inferred from entropy or detector identity, and the scanner's
+own thresholds are untouched.
+
+### Additive
+
+This reads output TruffleHog already produced. It does not change the command, does not decide whether
+the build fails -- keep using `--fail` / `SetFail()` -- and never turns verification on. Proving a report
+format should not involve authenticating anyone's credentials anywhere.
+
 ## Releasing
 
 See [MAINTAINERS.md](MAINTAINERS.md).
